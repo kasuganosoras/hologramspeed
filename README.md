@@ -13,7 +13,10 @@ Hologram Speedometer for FiveM
 4. Restart the server
 
 ## Host your own page
-ToDo
+The default UI page is host on the Github. if you want to host the page by yourself, you should:
+1. Copy the `ui` folder to your website root folder, such as `D:\Web\MyWebSite\`.
+2. Set `duiUrl = "http://your-website-here/ui/hologram.html"` in your `config.lua`.
+3. Restart the server.
 
 ## License
 hologramSpeed - Speedometer script for FiveM
