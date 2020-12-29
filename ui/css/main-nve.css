@@ -1,0 +1,107 @@
+@font-face {
+	font-family: 'Oswald-Regular';
+	src: url('../fonts/Oswald-Regular.eot');
+	src: url('../fonts/Oswald-Regular.eot#iefix') format('embedded-opentype'),
+		 url('../fonts/Oswald-Regular.woff') format('woff'),
+		 url('../fonts/Oswald-Regular.woff2') format('woff2'),
+		 url('../fonts/Oswald-Regular.ttf') format('truetype'),
+		 url('../fonts/Oswald-Regular.svg#webfont34M5alKg') format('svg');
+	font-weight: normal;
+	font-style: normal;
+}
+@font-face {
+	font-family: 'Oswald-Light';
+	src: url('../fonts/Oswald-Light.eot');
+	src: url('../fonts/Oswald-Light.eot#iefix') format('embedded-opentype'),
+		 url('../fonts/Oswald-Light.woff') format('woff'),
+		 url('../fonts/Oswald-Light.woff2') format('woff2'),
+		 url('../fonts/Oswald-Light.ttf') format('truetype'),
+		 url('../fonts/Oswald-Light.svg#webfont34M5alKg') format('svg');
+	font-weight: normal;
+	font-style: normal;
+}
+@font-face {
+    font-family: 'digital';
+    src: url("../fonts/digital.ttf");
+}
+.speedometer {
+	width: 100%;
+	position: fixed;
+	bottom: 32px;
+	color: rgba(45,45,45,0.65);
+    font-size: 28px;
+    font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif,Apple Color Emoji,Segoe UI Emoji;
+	filter: drop-shadow(0px 0px 3px rgba(0,0,0,0.3));
+}
+.geardisplay {
+	position: absolute;
+    left: 0px;
+    bottom: -3px;
+	color: rgb(0, 31, 2);
+	font-family: 'digital';
+}
+.speeddisplay {
+	position: absolute;
+    font-size: 100px;
+    bottom: 16px;
+	font-weight: 100;
+	font-family: 'digital';
+}
+.gray {
+	color: rgba(45,45,45,0.2);
+}
+.int1 {
+	position: absolute;
+	bottom: 0px;
+	left: 0px;
+}
+.int2 {
+	position: absolute;
+	bottom: 0px;
+	left: 60px;
+}
+.int3 {
+	position: absolute;
+	bottom: 0px;
+	left: 120px;
+}
+.unitdisplay {
+	position: absolute;
+    left: 125px;
+    bottom: -3px;
+	font-family: 'digital';
+}
+.abs {
+	position: absolute;
+    left: 180px;
+    bottom: 31px;
+	font-family: 'digital';
+}
+.handbrake {
+	position: absolute;
+    left: 180px;
+    bottom: 70px;
+	font-family: 'digital';
+}
+.rpmbg {
+	width: 225px;
+    height: 4px;
+    background: rgba(45,45,45,0.15);
+    position: absolute;
+    bottom: -14px;
+}
+.rpm {
+	width: 0%;
+	height: 100%;
+	background: rgba(45,45,45,0.65);;
+}
+.rpmOverload {
+	color: rgb(31, 0, 0);
+	border-color:rgb(31, 0, 0);
+}
+.reverseGear {
+	color: #232323;
+}
+.normalRpm {
+	color: rgb(0, 33, 15);
+}
