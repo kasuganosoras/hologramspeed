@@ -20,9 +20,11 @@ Hologram Speedometer for FiveM
 
 ## Commands
 - `/hsp` - Toggle the speedometer
-- `/hsp [theme]` - Set the theme of the speedometer
-- `/hsp default` - Reset the theme of the speedometer 
-Example use: `/hsp nve` (Set the theme to `nve`, the theme for NaturalVision Evolved)
+- `/hsp theme <name>` - Set the theme of the speedometer, the default theme is `default`.
+- `/hsp offset <x> <y> <z>` - Set the offset of the speedometer, leave xyz to blank will reset to default offset.
+- `/hsp rotate <x> <y> <z>` - Set the rotate of the speedometer, leave xyz to blank will reset to default rotate.
+
+Example use: `/hsp theme nve` (Set the theme to `nve`, the theme for NaturalVision Evolved)
 
 ## FAQ
 | FAQ |
