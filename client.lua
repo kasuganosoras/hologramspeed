@@ -1,279 +1,233 @@
-local DuiEntity
-local DuiTxd
-local DuiObj
-local DuiHandle
-local DuiLoaded = false
-local Enabled = true
-local IsDuiDisplayed = false
-local carRPM, carSpeed, carGear, carIL, carAcceleration, carHandbrake, carBrakePressure, carBrakeAbs, carLS_r, carLS_o, carLS_h
-local Profile
-local ProfileInitialized = false
+-- Constants
+local ResourceName = GetCurrentResourceName()
+local HologramURI = string.format("nui://%s/ui/hologram.html", ResourceName)
+local AttachmentOffset = vec3(2.5, -1, 0.85)
+local AttachmentRotation = vec3(0, 0, -15)
+local HologramModel = `hologram_box_model`
+local UpdateFrequency = 0 -- If less than average frame time, there will be an update every tick regardless of the actual number specified.
+local ThemeSettingKey = string.format("%s:theme", GetCurrentServerEndpoint()) -- The key to store the current theme setting in. As themes are per server, this key is also.
+local DBG = false -- Enables debug information, not very useful unless you know what you are doing!
 
-Citizen.CreateThread(function()
-	InitProfile()
+-- Variables
+local duiObject = false -- The DUI object, used for messaging and is destroyed when the resource is stopped
+local duiIsReady = false -- Set by a callback triggered by DUI once the javascript has fully loaded
+local hologramObject = 0 -- The current DUI anchor. 0 when one does not exist
+local usingMetric, shouldUseMetric = ShouldUseMetricMeasurements() -- Used to track the status of the metric measurement setting
+
+-- Preferences
+local displayEnabled = GetResourceKvpInt("displayEnabled") ~= 0
+local currentTheme = GetResourceKvpString(ThemeSettingKey) or GetConvar("hsp_defaultTheme", "default")
+
+local function DebugPrint(...)
+	if DBG then
+		print(...)
+	end
+end
+
+local function EnsureDuiMessage(data)
+	if duiObject and duiIsReady then
+		SendDuiMessage(duiObject, json.encode(data))
+		return true
+	end
+
+	return false
+end
+
+local function SendChatMessage(message)
+	TriggerEvent('chat:addMessage', {args = {message}})
+end
+
+-- Register a callback for when the DUI JS has loaded completely
+RegisterNUICallback("duiIsReady", function(_, cb)
+	duiIsReady = true
+    cb({ok = true})
 end)
 
-Citizen.CreateThread(function()
-	while ProfileInitialized == false do
-		Citizen.Wait(100)
-	end
-	while true do
-		Citizen.Wait(0)
-		if Enabled then
-			if IsPedInAnyVehicle(GetPlayerPed(-1), false) then
-				if IsDuiDisplayed then
-					UpdateDui()
-				else
-					DisplayDui()
-					IsDuiDisplayed = true
-				end
-			else
-				if IsDuiDisplayed then
-					HideDui()
-					IsDuiDisplayed = false
-				end
-			end
-		else
-			HideDui()
-			IsDuiDisplayed = false
-		end
-	end
-end)
+local function ToggleDisplay()
+	displayEnabled = not displayEnabled
+	SendChatMessage("Holographic speedometer " .. (displayEnabled and "^2enabled^r" or "^1disabled^r") .. ".") 
+	SetResourceKvpInt("displayEnabled", displayEnabled and 1 or 0)
+end
 
-Citizen.CreateThread(function()
-	while ProfileInitialized == false do
-		Citizen.Wait(100)
+local function SetTheme(newTheme)
+	if newTheme ~= currentTheme then
+		EnsureDuiMessage {theme = newTheme}
+		SendChatMessage(newTheme == "default" and "Holographic speedometer theme ^5reset^r." or ("Holographic speedometer theme set to ^5" .. newTheme .. "^r."))
+		currentTheme = newTheme
+		SetResourceKvp(ThemeSettingKey, newTheme)
 	end
-	while true do
-		Citizen.Wait(0)
-		if IsControlJustPressed(0, Profile.keyControl) then
-			Enabled = not Enabled
-			local CurrentStatus = Enabled and "^2On^0" or "^1Off^0"
-			SendChatMessage("Your speedometer has been switched to " .. CurrentStatus)
-		end
-	end
-end)
+end
 
-RegisterCommand('hsp', function(source, args)
-	local cmd = args[1] or ''
-	if cmd == 'mph' then
-		Profile.useMph = not Profile.useMph
-		SetPlayerProfile(Profile)
-		local CurrentUnit = Profile.useMph and "^2MPH^0" or "^2KPH^0"
-		SendChatMessage("Your speed unit has been switched to " .. CurrentUnit .. ", please restart your game to take effect")
-	elseif cmd == 'nve' then
-		Profile.useNve = not Profile.useNve
-		SetPlayerProfile(Profile)
-		local CurrentNve = Profile.useNve and "^2On^0" or "^1Off^0"
-		SendChatMessage("Your NVE graphic mods has been switched to " .. CurrentNve .. ", please restart your game to take effect")
+RegisterCommand("hsp", function(_, args)	
+	if #args == 0 then
+		ToggleDisplay()
 	else
-		Enabled = not Enabled
-		local CurrentStatus = Enabled and "^2On^0" or "^1Off^0"
-		SendChatMessage("Your speedometer has been switched to " .. CurrentStatus)
+		SetTheme(tostring(args[1]))
 	end
 end, false)
 
-function SendChatMessage(data)
-	TriggerEvent('chat:addMessage', {
-		args = { data }
-	})
+TriggerEvent('chat:addSuggestion', '/hsp', 'Toggle the holographic speedometer', {
+    { name = "theme", help = "Set the theme of the speedometer.\n\"default\" is the default theme." },
+})
+
+RegisterKeyMapping("hsp", "Toggle Holographic Speedometer", "keyboard", "grave") -- default: `
+
+-- Initialise the DUI. We only need to do this once.
+local function InitialiseDui()
+	DebugPrint("Initialising...")
+
+	duiObject = CreateDui(HologramURI, 512, 512)
+
+	DebugPrint("\tDUI created")
+
+	repeat Wait(0) until duiIsReady
+
+	DebugPrint("\tDUI available")
+
+	EnsureDuiMessage {
+		useMetric = usingMetric,
+		display = false,
+		theme = currentTheme
+	}
+
+	DebugPrint("\tDUI initialised")
+
+	local txdHandle = CreateRuntimeTxd("HologramDUI")
+	local duiHandle = GetDuiHandle(duiObject)
+	local duiTexture = CreateRuntimeTextureFromDuiHandle(txdHandle, "DUI", duiHandle)
+	DebugPrint("\tRuntime texture created")
+
+	-- We need to ensure that the texture is actually streamed into the game *before* we do the replacement
+	RequestModel(HologramModel)
+	DebugPrint("\tLoading model")
+	repeat Wait(0) until HasModelLoaded(HologramModel)
+
+	AddReplaceTexture("hologram_box_model", "p_hologram_box", "HologramDUI", "DUI")
+	SetModelAsNoLongerNeeded(HologramModel)
+	DebugPrint("\tTexture replacement complete")
+
+	DebugPrint("Done!")
 end
 
-function InitProfile()
-	Profile = GetPlayerProfile()
-	if Profile.unit == nil then
-		Profile.unit = Config.unit
+-- Main Loop
+CreateThread(function()
+	-- Sanity checks
+	if string.lower(ResourceName) ~= ResourceName then
+		return
 	end
-	if Profile.keyControl == nil then
-		Profile.keyControl = Config.keyControl
-	end
-	if Profile.useNve == nil then
-		Profile.useNve = Config.useNve
-	end
-	SetPlayerProfile(Profile)
-	ProfileInitialized = true
-end
 
-function CreateHologramDui()
-	print("Loading " .. Config.duiUrl)
-	local urlHash = "#"
-	local jsonTemp = {}
-	if Profile.useMph then
-		jsonTemp.unit = "MPH"
-	else
-		jsonTemp.unit = "KPH"
+	if not IsModelInCdimage(HologramModel) or not IsModelAVehicle(HologramModel) then
+		SendChatMessage("^1Could not find `hologram_box_model` in the game... ^rHave you installed the resource correctly?")
+		return
 	end
-	if Profile.useNve then
-		jsonTemp.nve = true
-	else
-		jsonTemp.nve = false
-	end
-	urlHash = urlHash .. json.encode(jsonTemp)
-	DuiTxd = CreateRuntimeTxd('DuiHologramTxd')
-	DuiObj = CreateDui(Config.duiUrl .. urlHash, 512, 512)
-	while not IsDuiAvailable(DuiObj) do
-		Wait(100)
-	end
-	print("Successful create Dui")
-	_G.DuiObj = DuiObj
-	DuiHandle = GetDuiHandle(DuiObj)
-	local tx5 = CreateRuntimeTextureFromDuiHandle(DuiTxd, 'DuiTexture', DuiHandle)
-	print("Replace textures...")
-	AddReplaceTexture('hologram_box_model', 'p_hologram_box', 'DuiHologramTxd', 'DuiTexture')
-end
 
-function DestroyHologramDui()
-	DestroyDui(DuiObj)
-end
+	InitialiseDui()
 
-function UpdateDui()
+	-- This thread watches for changes to the user's preferred measurement system
+	CreateThread(function()	
+		while true do
+			Wait(1000)
 	
-	if not DoesEntityExist(DuiEntity) then
-		DisplayDui()
-	end
+			shouldUseMetric = ShouldUseMetricMeasurements()
 	
-	playerPed = GetPlayerPed(-1)
-		
-	if playerPed and IsDuiDisplayed then
-		
-		playerCar = GetVehiclePedIsIn(playerPed, false)
-		
-		if playerCar and GetPedInVehicleSeat(playerCar, -1) == playerPed then
-			
-			local NcarRPM                      = GetVehicleCurrentRpm(playerCar)
-			local NcarSpeed                    = GetEntitySpeed(playerCar)
-			local NcarGear                     = GetVehicleCurrentGear(playerCar)
-			local NcarIL                       = GetVehicleIndicatorLights(playerCar)
-			local NcarAcceleration             = IsControlPressed(0, 71)
-			local NcarHandbrake                = GetVehicleHandbrake(playerCar)
-			local NcarBrakePressure            = GetVehicleWheelBrakePressure(playerCar, 0)
-			local NcarBrakeAbs                 = (GetVehicleWheelSpeed(playerCar, 0) == 0.0 and NcarSpeed > 0.0)
-			local NcarLS_r, NcarLS_o, NcarLS_h = GetVehicleLightsState(playerCar)
-			
-			local shouldUpdate = false
-			
-			if NcarRPM ~= carRPM then
-				shouldUpdate = true
+			if usingMetric ~= shouldUseMetric and EnsureDuiMessage {useMetric = shouldUseMetric} then
+				usingMetric = shouldUseMetric
 			end
-			if NcarSpeed ~= carSpeed then
-				shouldUpdate = true
-			end
-			if NcarGear ~= carGear then
-				shouldUpdate = true
-			end
-			if NcarIL ~= carIL then
-				shouldUpdate = true
-			end
-			if NcarAcceleration ~= carAcceleration then
-				shouldUpdate = true
-			end
-			if NcarHandbrake ~= carHandbrake then
-				shouldUpdate = true
-			end
-			if NcarBrakePressure ~= carBrakePressure then
-				shouldUpdate = true
-			end
-			if NcarBrakeAbs ~= carBrakeAbs then
-				shouldUpdate = true
-			end
-			if NcarLS_r ~= carLS_r then
-				shouldUpdate = true
-			end
-			if NcarLS_o ~= carLS_o then
-				shouldUpdate = true
-			end
-			if NcarLS_h ~= carLS_h then
-				shouldUpdate = true
-			end
-			
-			if shouldUpdate then
-				carRPM           = NcarRPM
-				carGear          = NcarGear
-				carSpeed         = NcarSpeed
-				carIL            = NcarIL
-				carAcceleration  = NcarAcceleration
-				carHandbrake     = NcarHandbrake
-				carBrakePressure = NcarBrakePressure
-				carBrakeAbs      = NcarBrakeAbs
-				carLS_r          = NcarLS_r
-				carLS_o          = NcarLS_o
-				carLS_h          = NcarLS_h
-				
-				if Profile.useMph then
-					carCalcSpeed = math.ceil(carSpeed * 2.236936)
-				else
-					carCalcSpeed = math.ceil(carSpeed * 3.6)
-				end
-				
-				SendDuiMessage(DuiObj, json.encode({
-					ShowHud                = true,
-					CurrentCarRPM          = carRPM,
-					CurrentCarGear         = carGear,
-					CurrentCarSpeed        = carCalcSpeed,
-					CurrentCarIL           = carIL,
-					CurrentCarAcceleration = carAcceleration,
-					CurrentCarHandbrake    = carHandbrake,
-					CurrentCarBrake        = carBrakePressure,
-					CurrentCarAbs          = carBrakeAbs,
-					CurrentCarLS_r         = carLS_r,
-					CurrentCarLS_o         = carLS_o,
-					CurrentCarLS_h         = carLS_h,
-					PlayerID               = GetPlayerServerId(GetPlayerIndex())
-				}))
-			end
-		elseif IsDuiDisplayed then
-			SendDuiMessage(DuiObj, json.encode({HideHud = true}))
 		end
-		
-		Wait(50)
+	end)
+
+	local playerPed, currentVehicle, vehicleSpeed
+
+	while true do
+		playerPed = PlayerPedId()
+
+		if IsPedInAnyVehicle(playerPed) then
+			currentVehicle = GetVehiclePedIsIn(playerPed, false)
+
+			-- When the player is in the drivers seat of their current vehicle...
+			if GetPedInVehicleSeat(currentVehicle, -1) == playerPed then
+				-- Ensure the display is off before we start
+				EnsureDuiMessage {display = false}
+
+				-- Load the hologram model
+				RequestModel(HologramModel)
+				repeat Wait(0) until HasModelLoaded(HologramModel)
+
+				-- Create the hologram objec
+				hologramObject = CreateVehicle(HologramModel, GetEntityCoords(currentVehicle), 0.0, false, true)
+				SetVehicleIsConsideredByPlayer(hologramObject, false)
+				SetVehicleEngineOn(hologramObject, true, true)
+				SetEntityCollision(hologramObject, false, false)
+				DebugPrint("DUI anchor created "..tostring(hologramObject))
+
+				SetModelAsNoLongerNeeded(HologramModel)
+
+				-- If the ped's current vehicle still exists and they are still driving it...
+				if DoesEntityExist(currentVehicle) and GetPedInVehicleSeat(currentVehicle, -1) == playerPed then
+					-- Attach the hologram to the vehicle
+					AttachEntityToEntity(hologramObject, currentVehicle, GetEntityBoneIndexByName(currentVehicle, "chassis"), AttachmentOffset, AttachmentRotation, false, false, false, false, false, true)
+					DebugPrint(string.format("DUI anchor %s attached to %s", hologramObject, currentVehicle))
+
+					-- Wait until the engine is on before enabling the hologram proper
+					repeat Wait(0) until IsVehicleEngineOn(currentVehicle)
+
+					-- Until the player is no longer driving this vehicle, update the UI
+					repeat
+						vehicleSpeed = GetEntitySpeed(currentVehicle)
+
+						EnsureDuiMessage {
+							display = displayEnabled and IsVehicleEngineOn(currentVehicle),
+							rpm = GetVehicleCurrentRpm(currentVehicle),
+							gear = GetVehicleCurrentGear(currentVehicle),
+							abs = (GetVehicleWheelSpeed(currentVehicle, 0) == 0.0) and (vehicleSpeed > 0.0),
+							hBrake = GetVehicleHandbrake(currentVehicle),
+							rawSpeed = vehicleSpeed,
+						}
+
+						-- Wait for the next frame or half a second if we aren't displaying
+						Wait(displayEnabled and UpdateFrequency or 500)
+					until GetPedInVehicleSeat(currentVehicle, -1) ~= PlayerPedId()
+				end
+			end
+		end
+
+		-- At this point, the player is no longer driving a vehicle or was never driving a vehicle this cycle 
+
+		-- If there is a hologram object currently created...
+		if hologramObject ~= 0 and DoesEntityExist(hologramObject) then
+			-- Delete the hologram object
+			DeleteVehicle(hologramObject)
+			DebugPrint("DUI anchor deleted "..tostring(hologramObject))
+		else
+			-- Instead of setting this in the above block, clearing the handle here ensures that the entity must not exist before it's handle is lost.
+			hologramObject = 0
+		end
+
+		-- We don't need to check every single frame for the player being in a vehicle so we check every second
+		Wait(1000)
 	end
-end
+end)
 
-function HideDui()
-	SetEntityAsNoLongerNeeded(DuiEntity)
-	DeleteVehicle(DuiEntity)
-	DeleteEntity(DuiEntity)
-end
+-- Resource cleanup
+AddEventHandler("onResourceStop", function(resource)
+	if resource == ResourceName then
+		DebugPrint("Cleaning up...")
 
-function DisplayDui()
-	if not IsModelInCdimage(Config.modelName) or not IsModelAVehicle(Config.modelName) then
-        TriggerEvent('chat:addMessage', {
-            args = { 'Cannot find the model "' .. Config.modelName .. '", please make sure you install the plugin correctly' }
-        })
-        return
-    end
-	print("Creating model...")
-    RequestModel(Config.modelName)
-    while not HasModelLoaded(Config.modelName) do
-        Citizen.Wait(500)
-    end
-	local pos       = GetEntityCoords(GetPlayerPed(-1))
-	local playerCar = GetVehiclePedIsIn(GetPlayerPed(-1))
-    DuiEntity = CreateVehicle(Config.modelName, pos.x, pos.y, pos.z, GetEntityHeading(GetPlayerPed(-1)), false, false)
-	print("Setting entity status...")
-	SetVehicleEngineOn(DuiEntity, true, true)
-	SetVehicleDoorsLockedForAllPlayers(DuiEntity, true)
-	print("Attach to entity...")
-	local EntityBone = GetEntityBoneIndexByName(playerCar, "chassis")
-	local BindPos = {x = 2.5, y = -1.0, z = 0.85}
-	AttachEntityToEntity(DuiEntity, playerCar, EntityBone, BindPos.x, BindPos.y, BindPos.z, 0.0, 0.0, -15.0, false, false, false, false, false, true)
-	Citizen.Wait(200)
-	if not DuiLoaded then
-		print("Creating Dui...")
-		CreateHologramDui()
-		DuiLoaded = true
+		displayEnabled = false
+		DebugPrint("\tDisplay disabled")
+
+		if DoesEntityExist(hologramObject) then
+			DeleteVehicle(hologramObject)
+			DebugPrint("\tDUI anchor deleted "..tostring(hologramObject))
+		end
+
+		RemoveReplaceTexture("hologram_box_model", "p_hologram_box")
+		DebugPrint("\tReplace texture removed")
+
+		if duiObject then
+			DebugPrint("\tDUI browser destroyed")
+			DestroyDui(duiObject)
+			duiObject = false
+		end
 	end
-end
-
-function GetPlayerProfile()
-	local kvpData = GetResourceKvpString("HologramProfile")
-	if kvpData ~= nil then
-		return json.decode(kvpData)
-	else
-		return {}
-	end
-end
-
-function SetPlayerProfile(data)
-	SetResourceKvp("HologramProfile", json.encode(data))
-end
+end)
