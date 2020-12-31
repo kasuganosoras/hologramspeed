@@ -12,43 +12,31 @@ Hologram Speedometer for FiveM
 3. Add `start hologramSpeed` to your server.cfg
 4. Restart the server
 
-## Configuration
-| Name       | Description                                                                      | Type    | Example                                                          |
-| ---------- | -------------------------------------------------------------------------------- | :-----: | ---------------------------------------------------------------- |
-| modelName  | The hologram model name, do not change this if you don't know what are you doing | String  | `hologram_box_model`                                             |
-| duiUrl     | The url of the UI web page, default page is host on Github                       | String  | `https://kasuganosoras.github.io/hologramSpeed/ui/hologram.html` |
-| keyControl | The key to display/hide the speedometer                                          | Number  | `243`                                                            |
-| useMph     | Enable or disable MPH display, if set to `false`, it will display KPH            | Boolean | `false`                                                          |
-| useNve     | If you using NVE graphic mods, you should turn this on                           | Boolean | `false`                                                          |
+## Convars
+| Name             | Description                                         | Type   | Example   |
+| ---------------- | --------------------------------------------------- | :----: | --------- |
+| hsp_defaultTheme | The default theme applied to the speedometer        | String | "default" |
 
 ## Commands
-The base command is: `/hsp`, parameters:
-- (No parameter) - Display or hide the speedometer
-- `mph` - Enable or disable the MPH display (Need restart game)
-- `nve` - Enable or disable the NVE mode (Need restart game)
-
-Example use: `/hsp mph` (Turn on the MPH display)
+- `/hsp` - Toggle the speedometer
+- `/hsp [theme]` - Set the theme of the speedometer
+- `/hsp default` - Reset the theme of the speedometer 
+Example use: `/hsp nve` (Set the theme to `nve`, the theme for NaturalVision Evolved)
 
 ## FAQ
 | FAQ |
-| ------------------------------------- |
+| --- |
 | __Q: Why my speedometer is blurred?__ |
 | A: You should remove your NVE Motion Blur mod and disable motion blur in the game settings. |
-| __Q: Why I can't see the speedometer UI? I only can see your avatar.__ |
-| A: Check your configuration and make sure your `duiUrl` is correct and accessible. |
+| __Q: Why I can't see the speedometer?__ |
+| A: Make sure that you have installed the resource correctly. The name of your resource may not be compatible with NUI due to DNS name restrictions. |
 
-If you have any other question, please reply in the FiveM forum, or join our [Discord](https://discord.gg/3KKtpQT) server
+If you have any other questions, please reply to the FiveM forums [post](https://forum.cfx.re/t/release-hologram-speedometer/1959568), or join our [Discord](https://discord.gg/3KKtpQT) server.
 
-## Host your own page
-The default UI page is host on the Github. if you want to host the page by yourself, you should:
-1. Copy the `ui` folder to your website root folder, such as `D:\Web\MyWebSite\`.
-2. Set `duiUrl = "http://your-website-here/ui/hologram.html"` in your `config.lua`.
-3. Restart the server.
-
-## License
+## License (abridged)
 hologramSpeed - Speedometer script for FiveM
 
-Copyright (C) 2020 Akkariin
+Copyright (C) 2020 Akkariin & [Contributors](https://github.com/kasuganosoras/hologramSpeed/contributors)
 
 This program Is free software: you can redistribute it And/Or modify it under the terms Of the GNU General Public License As published by the Free Software Foundation, either version 3 Of the License, Or (at your option) any later version.
 

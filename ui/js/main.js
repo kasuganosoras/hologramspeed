@@ -1,110 +1,89 @@
-var s_playerID;
-var s_Rpm = 0.0;
-var s_Speed;
-var s_Gear;
-var s_IL;
-var s_Acceleration;
-var s_Handbrake;
-var s_Brake;
-var s_Abs;
-var s_LS_r;
-var s_LS_o;
-var s_LS_h;
-var CalcSpeed;
-var speedText = '';
-var inVehicle = false;
-var o_rpm;
-var hasFilter = false;
-var OverLoadRPM = false;
-var IsOverLoad = false;
+const DisplayRoot = document.getElementById("displayRoot");
+const GearDisplay = document.getElementById("gearDisplay");
+const GearNum = document.getElementById("gearNum");
+const UnitDisplay = document.getElementById("unitDisplay");
+const AbsIndicator = document.getElementById("absIndicator");
+const HBrakeIndicator = document.getElementById("hBrakeIndicator");
+const RpmDisplay = document.getElementById("rpmBar");
+const SpeedDisplay = [
+	document.getElementById("speedDisplayDigit_0"),
+	document.getElementById("speedDisplayDigit_1"),
+	document.getElementById("speedDisplayDigit_2"),
+];
+var useMetric = true;
 
-$(function() {
+function changeTheme(name) {
+	const oldThemeElement = document.getElementById("themeStylesheet");
 	
-    window.addEventListener("message", function(event) {
-        var item = event.data;
-        
-        if (item.ShowHud) {
-			
-			inVehicle      = true;
-			s_PlayerID     = item.PlayerID;
-			s_Rpm          = item.CurrentCarRPM;
-			s_Speed        = item.CurrentCarSpeed;
-			s_Gear         = item.CurrentCarGear;
-			s_IL           = item.CurrentCarIL;
-			s_Acceleration = item.CurrentCarAcceleration;
-			s_Handbrake    = item.CurrentCarHandbrake;
-			s_Brake        = item.CurrentCarBrake;
-			s_Abs          = item.CurrentCarAbs;
-			s_LS_r         = item.CurrentCarLS_r;
-			s_LS_o         = item.CurrentCarLS_o;
-			s_LS_h         = item.CurrentCarLS_h;
-			CalcSpeed      = s_Speed;
-			CalcRpm        = (s_Rpm * 9);
-			
-			if(CalcSpeed > 999) {
-				CalcSpeed = 999;
-			}
-			
-			// Vehicle Gear display
-			if(s_Gear == 0) {
-				$(".geardisplay span").html("R");
-				$(".geardisplay").removeClass("normalGear");
-				$(".geardisplay").addClass("reverseGear");
-			} else {
-				$(".geardisplay").removeClass("reverseGear");
-				$(".geardisplay span").html(s_Gear);
-				if(CalcRpm > 7.5) {
-					$(".geardisplay").removeClass("normalGear");
-					$(".geardisplay").addClass("rpmOverload");
-				} else {
-					$(".geardisplay").removeClass("rpmOverload");
-					$(".geardisplay").addClass("normalGear");
-				}
-			}
-			
-			// Vehicle RPM display
-			$(".rpm").css('width', (s_Rpm * 100).toFixed(2) + '%');
-			
-			// Vehicle speed display
-			if(CalcSpeed > 100) {
-				var tmpSpeed = Math.floor(CalcSpeed) + '';
-				speedText = '<span class="int1">' + tmpSpeed.substr(0, 1) + '</span><span class="int2">' + tmpSpeed.substr(1, 1) + '</span><span class="int3">' + tmpSpeed.substr(2, 1) + '</span>';
-			} else if(CalcSpeed > 10 && CalcSpeed < 100) {
-				var tmpSpeed = Math.floor(CalcSpeed) + '';
-				speedText = '<span class="gray int1">0</span><span class="int2">' + tmpSpeed.substr(0, 1) + '</span><span class="int3">' + tmpSpeed.substr(1, 1) + '</span>';
-			} else if(CalcSpeed > 0 && CalcSpeed < 10) {
-				speedText = '<span class="gray int1">0</span><span class="gray int2">0</span><span class="int3">' + Math.floor(CalcSpeed) + '</span>';
-			} else {
-				speedText = '<span class="gray int1">0</span><span class="gray int2">0</span><span class="gray int3">0</span>';
-			}
-			
-			// Handbrake
-			if(s_Handbrake) {
-				$(".handbrake").html("HBK");
-			} else {
-				$(".handbrake").html('<span class="gray">HBK</span>');
-			}
-			
-			// Brake ABS
-			if(s_Brake > 0) {
-				if(!s_Abs) {
-					$(".abs").html("ABS");
-				} else {
-					$(".abs").html('<span class="gray">ABS</span>');
-				}
-			} else {
-				$(".abs").html('<span class="gray">ABS</span>');
-			}
-			
-			// Display speed and container
-			$(".speeddisplay").html(speedText);
-			$(".speedometer").fadeIn(500);
-			
-        } else if (item.HideHud) {
-			
-			// Hide GUI
-			$(".speedometer").fadeOut(500);
-			inVehicle = false;
-        }
-    });
+	if (name != "default") {
+		const newThemeElement = document.createElement("link");
+		newThemeElement.href = `css/themes/${name}.css`;
+		newThemeElement.rel = "stylesheet";
+		newThemeElement.type = "text/css";
+		newThemeElement.id = "themeStylesheet";
+		document.head.appendChild(newThemeElement);
+	}
+
+	if (oldThemeElement != undefined) oldThemeElement.remove();
+}
+
+window.addEventListener("message", function(ev) {
+	const data = ev.data;
+
+	if (data.theme != undefined) changeTheme(data.theme);
+
+	if (data.useMetric != undefined) {
+		const useMetricNow = data.useMetric != false;
+		if (useMetric != useMetricNow) {
+			useMetric = useMetricNow;
+			UnitDisplay.innerText = useMetric ? "KMH" : "MPH";
+		}
+	}
+
+	if (data.rawSpeed != undefined) {
+		var multiplier = useMetric ? 3.6 : 2.236936;
+		var unitSpeed = Math.floor(parseFloat(data.rawSpeed) * multiplier);
+		var speedString = unitSpeed.toString().padStart(3, '&');
+
+		if (speedString.length > 3) speedString = "999";
+
+		for (let i = 0; i < 3; i++) {
+			SpeedDisplay[i].innerText = speedString[i] == "&" ? "" : speedString[i]; 
+		}
+	}
+
+	if (data.gear != undefined) {
+		const gear = parseInt(data.gear);
+		if (gear == 0) {
+			GearNum.innerText = "R";
+			GearDisplay.classList.add("reverseGear");
+			GearDisplay.classList.remove("normalGear");
+		} else {
+			GearNum.innerText = gear;
+			GearDisplay.classList.remove("reverseGear");
+			GearDisplay.classList.add("normalGear");
+		}
+	}
+
+	if (data.rpm != undefined) {
+		const rawRpm = parseFloat(data.rpm);
+		RpmDisplay.style.width = `${(parseFloat(data.rpm) * 100.0).toFixed(2)}%`;
+		GearDisplay.classList.toggle("rpmOverload", (rawRpm * 9) > 7.5);
+	}
+
+	if (data.hBrake != undefined) HBrakeIndicator.classList.toggle("inactive", data.hBrake == false);
+	
+	if (data.abs != undefined) AbsIndicator.classList.toggle("inactive", data.abs == false);
+
+	if (data.display != undefined) DisplayRoot.classList.toggle("hidden", !data.display);
 });
+
+// Due to loading order, we need to let the resource side know when *we* are ready.
+// Just having the browser "loaded" isn't enough.
+fetch(`https://${document.location.host}/duiIsReady`, {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
+    },
+    body: JSON.stringify({ok: true})
+})

@@ -14,10 +14,8 @@ files {
 	'ui/*.*'
 }
 
-client_scripts {
-	'config.lua',
-	'client.lua',
-}
+client_script 'client.lua'
+server_script 'server.lua'
 
 data_file 'HANDLING_FILE' 'data/handling.meta'
 data_file 'VEHICLE_METADATA_FILE' 'data/vehicles.meta'
