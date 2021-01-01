@@ -4,7 +4,7 @@ game 'gta5'
 author 'Akkariin'
 description 'A hologram speedometer script for FiveM'
 url 'https://www.zerodream.net/'
-version '1.0.1'
+version '1.0.2'
 
 files {
 	'data/handling.meta',
