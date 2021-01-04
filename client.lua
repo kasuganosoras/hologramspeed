@@ -16,7 +16,6 @@ local duiObject      = false -- The DUI object, used for messaging and is destro
 local duiIsReady     = false -- Set by a callback triggered by DUI once the javascript has fully loaded
 local hologramObject = 0 -- The current DUI anchor. 0 when one does not exist
 local usingMetric, shouldUseMetric = ShouldUseMetricMeasurements() -- Used to track the status of the metric measurement setting
-local textureReplacementMade = false -- Due to some weirdness with the experimental replace texture native, we need to make the replacement after the anchor has been spawned in-game
 
 -- Preferences
 local displayEnabled = false
@@ -246,19 +245,16 @@ CreateThread(function()
 				RequestModel(HologramModel)
 				repeat Wait(0) until HasModelLoaded(HologramModel)
 
+				-- It seems that once the texture unloads(?) the replacement is also removed and never get's added back.
+				-- This will ensure that any time the model is about to be used, the texture will be replaced
+				AddReplaceTexture("hologram_box_model", "p_hologram_box", "HologramDUI", "DUI")
+
 				-- Create the hologram object
 				hologramObject = CreateVehicle(HologramModel, GetEntityCoords(currentVehicle), 0.0, false, true)
 				SetVehicleIsConsideredByPlayer(hologramObject, false)
 				SetVehicleEngineOn(hologramObject, true, true)
 				SetEntityCollision(hologramObject, false, false)
 				DebugPrint("DUI anchor created "..tostring(hologramObject))
-
-				-- Odd hacky fix for people who's textures won't replace properly
-				if not textureReplacementMade then
-					AddReplaceTexture("hologram_box_model", "p_hologram_box", "HologramDUI", "DUI")
-					DebugPrint("Texture replacement made")
-					textureReplacementMade = true
-				end
 
 				SetModelAsNoLongerNeeded(HologramModel)
 
