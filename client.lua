@@ -105,8 +105,8 @@ end
 
 local function CommandHandler(args)
 
-	local msgErr = "^1The acceptance range of ^0%s ^1is ^0%f^1 ~ ^0%f^1, reset to default setting.^r"
-	local msgSuc = "^2Speedometer ^0%s ^2change to ^0%f, %f, %f^r"
+	local msgErr = "^1The the acceptable range for ^0%s ^1is ^0%f^1 ~ ^0%f^1, reset to default setting.^r"
+	local msgSuc = "^2Speedometer ^0%s ^2changed to ^0%f, %f, %f^r"
 	
 	if args[1] == "theme" then
 		if #args >= 2 then
@@ -123,7 +123,7 @@ local function CommandHandler(args)
 				SendChatMessage(string.format(msgErr, args[1], -5.0, 5.0))
 			end
 		else
-			SendChatMessage("Reset to default offset, to change the offset, use: /hsp offset <X> <Y> <Z>")
+			SendChatMessage("Offset reset. To change the offset, use: /hsp offset <X> <Y> <Z>")
 		end
 		AttachmentOffset = vec3(nx, ny, nz)
 		UpdateEntityAttach()
@@ -138,7 +138,7 @@ local function CommandHandler(args)
 				SendChatMessage(string.format(msgErr, args[1], -45.0, 45.0))
 			end
 		else
-			SendChatMessage("Reset to default rotate, to change the rotate, use: /hsp rotate <X> <Y> <Z>")
+			SendChatMessage("Rotation reset. To change the rotation, use: /hsp rotate <X> <Y> <Z>")
 		end
 		AttachmentRotation = vec3(nx, ny, nz)
 		UpdateEntityAttach()
@@ -196,15 +196,6 @@ local function InitialiseDui()
 	local duiTexture = CreateRuntimeTextureFromDuiHandle(txdHandle, "DUI", duiHandle)
 	DebugPrint("\tRuntime texture created")
 
-	-- We need to ensure that the texture is actually streamed into the game *before* we do the replacement
-	RequestModel(HologramModel)
-	DebugPrint("\tLoading model")
-	repeat Wait(0) until HasModelLoaded(HologramModel)
-
-	AddReplaceTexture("hologram_box_model", "p_hologram_box", "HologramDUI", "DUI")
-	SetModelAsNoLongerNeeded(HologramModel)
-	DebugPrint("\tTexture replacement complete")
-
 	DebugPrint("Done!")
 end
 
@@ -254,7 +245,11 @@ CreateThread(function()
 				RequestModel(HologramModel)
 				repeat Wait(0) until HasModelLoaded(HologramModel)
 
-				-- Create the hologram objec
+				-- It seems that once the texture unloads(?) the replacement is also removed and never get's added back.
+				-- This will ensure that any time the model is about to be used, the texture will be replaced
+				AddReplaceTexture("hologram_box_model", "p_hologram_box", "HologramDUI", "DUI")
+
+				-- Create the hologram object
 				hologramObject = CreateVehicle(HologramModel, GetEntityCoords(currentVehicle), 0.0, false, true)
 				SetVehicleIsConsideredByPlayer(hologramObject, false)
 				SetVehicleEngineOn(hologramObject, true, true)
