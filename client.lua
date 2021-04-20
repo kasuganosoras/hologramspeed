@@ -17,6 +17,7 @@ local duiIsReady     = false -- Set by a callback triggered by DUI once the java
 local hologramObject = 0 -- The current DUI anchor. 0 when one does not exist
 local usingMetric, shouldUseMetric = ShouldUseMetricMeasurements() -- Used to track the status of the metric measurement setting
 local textureReplacementMade = false -- Due to some weirdness with the experimental replace texture native, we need to make the replacement after the anchor has been spawned in-game
+local idletickrate = 100
 
 -- Preferences
 local displayEnabled = false
@@ -234,61 +235,68 @@ CreateThread(function()
 	while true do
 		playerPed = PlayerPedId()
 
-		if IsPedInAnyVehicle(playerPed) then
-			currentVehicle = GetVehiclePedIsIn(playerPed, false)
+		if IsEntityVisible(playerPed) then
 
-			-- When the player is in the drivers seat of their current vehicle...
-			if GetPedInVehicleSeat(currentVehicle, -1) == playerPed then
-				-- Ensure the display is off before we start
-				EnsureDuiMessage {display = false}
+			if IsPedInAnyVehicle(playerPed) then
+				currentVehicle = GetVehiclePedIsIn(playerPed, false)
 
-				-- Load the hologram model
-				RequestModel(HologramModel)
-				repeat Wait(0) until HasModelLoaded(HologramModel)
+				-- When the player is in the drivers seat of their current vehicle...
+				if GetPedInVehicleSeat(currentVehicle, -1) == playerPed then
+					-- Ensure the display is off before we start
+					EnsureDuiMessage {display = false}
 
-				-- Create the hologram object
-				hologramObject = CreateVehicle(HologramModel, GetEntityCoords(currentVehicle), 0.0, false, true)
-				SetVehicleIsConsideredByPlayer(hologramObject, false)
-				SetVehicleEngineOn(hologramObject, true, true)
-				SetEntityCollision(hologramObject, false, false)
-				DebugPrint("DUI anchor created "..tostring(hologramObject))
+					-- Load the hologram model
+					RequestModel(HologramModel)
+					repeat Wait(0) until HasModelLoaded(HologramModel)
 
-				-- Odd hacky fix for people who's textures won't replace properly
-				if not textureReplacementMade then
-					AddReplaceTexture("hologram_box_model", "p_hologram_box", "HologramDUI", "DUI")
-					DebugPrint("Texture replacement made")
-					textureReplacementMade = true
+					-- Create the hologram object
+					hologramObject = CreateVehicle(HologramModel, GetEntityCoords(currentVehicle), 0.0, false, true)
+					SetVehicleIsConsideredByPlayer(hologramObject, false)
+					SetVehicleEngineOn(hologramObject, true, true)
+					SetEntityCollision(hologramObject, false, false)
+					DebugPrint("DUI anchor created "..tostring(hologramObject))
+
+					-- Odd hacky fix for people who's textures won't replace properly
+					if not textureReplacementMade then
+						AddReplaceTexture("hologram_box_model", "p_hologram_box", "HologramDUI", "DUI")
+						DebugPrint("Texture replacement made")
+						textureReplacementMade = true
+					end
+
+					SetModelAsNoLongerNeeded(HologramModel)
+
+					-- If the ped's current vehicle still exists and they are still driving it...
+					if DoesEntityExist(currentVehicle) and GetPedInVehicleSeat(currentVehicle, -1) == playerPed then
+						-- Attach the hologram to the vehicle
+						AttachEntityToEntity(hologramObject, currentVehicle, GetEntityBoneIndexByName(currentVehicle, "chassis"), AttachmentOffset, AttachmentRotation, false, false, false, false, false, true)
+						DebugPrint(string.format("DUI anchor %s attached to %s", hologramObject, currentVehicle))
+
+						-- Wait until the engine is on before enabling the hologram proper
+						repeat Wait(0) until IsVehicleEngineOn(currentVehicle)
+
+						-- Until the player is no longer driving this vehicle, update the UI
+						repeat
+							vehicleSpeed = GetEntitySpeed(currentVehicle)
+
+							EnsureDuiMessage {
+								display  = displayEnabled and IsVehicleEngineOn(currentVehicle),
+								rpm      = GetVehicleCurrentRpm(currentVehicle),
+								gear     = GetVehicleCurrentGear(currentVehicle),
+								abs      = (GetVehicleWheelSpeed(currentVehicle, 0) == 0.0) and (vehicleSpeed > 0.0),
+								hBrake   = GetVehicleHandbrake(currentVehicle),
+								rawSpeed = vehicleSpeed,
+							}
+
+							-- Wait for the next frame or half a second if we aren't displaying
+							Wait(displayEnabled and UpdateFrequency or 500)
+						until GetPedInVehicleSeat(currentVehicle, -1) ~= PlayerPedId()
+					end
 				end
-
-				SetModelAsNoLongerNeeded(HologramModel)
-
-				-- If the ped's current vehicle still exists and they are still driving it...
-				if DoesEntityExist(currentVehicle) and GetPedInVehicleSeat(currentVehicle, -1) == playerPed then
-					-- Attach the hologram to the vehicle
-					AttachEntityToEntity(hologramObject, currentVehicle, GetEntityBoneIndexByName(currentVehicle, "chassis"), AttachmentOffset, AttachmentRotation, false, false, false, false, false, true)
-					DebugPrint(string.format("DUI anchor %s attached to %s", hologramObject, currentVehicle))
-
-					-- Wait until the engine is on before enabling the hologram proper
-					repeat Wait(0) until IsVehicleEngineOn(currentVehicle)
-
-					-- Until the player is no longer driving this vehicle, update the UI
-					repeat
-						vehicleSpeed = GetEntitySpeed(currentVehicle)
-
-						EnsureDuiMessage {
-							display  = displayEnabled and IsVehicleEngineOn(currentVehicle),
-							rpm      = GetVehicleCurrentRpm(currentVehicle),
-							gear     = GetVehicleCurrentGear(currentVehicle),
-							abs      = (GetVehicleWheelSpeed(currentVehicle, 0) == 0.0) and (vehicleSpeed > 0.0),
-							hBrake   = GetVehicleHandbrake(currentVehicle),
-							rawSpeed = vehicleSpeed,
-						}
-
-						-- Wait for the next frame or half a second if we aren't displaying
-						Wait(displayEnabled and UpdateFrequency or 500)
-					until GetPedInVehicleSeat(currentVehicle, -1) ~= PlayerPedId()
-				end
+			else
+				Citizen.Wait(idletickrate)
 			end
+		else
+			Citizen.Wait(idletickrate)
 		end
 
 		-- At this point, the player is no longer driving a vehicle or was never driving a vehicle this cycle 
