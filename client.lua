@@ -247,11 +247,7 @@ CreateThread(function()
 				repeat Wait(0) until HasModelLoaded(HologramModel)
 
 				-- Create the hologram object
-				hologramObject = CreateVehicle(HologramModel, GetEntityCoords(currentVehicle), 0.0, false, true)
-				SetVehicleIsConsideredByPlayer(hologramObject, false)
-				SetVehicleEngineOn(hologramObject, true, true)
-				SetEntityCollision(hologramObject, false, false)
-				DebugPrint("DUI anchor created "..tostring(hologramObject))
+				hologramObject=createHologram(HologramModel,currentVehicle)
 
 				-- Odd hacky fix for people who's textures won't replace properly
 				if not textureReplacementMade then
@@ -265,11 +261,17 @@ CreateThread(function()
 				-- If the ped's current vehicle still exists and they are still driving it...
 				if DoesEntityExist(currentVehicle) and GetPedInVehicleSeat(currentVehicle, -1) == playerPed then
 					-- Attach the hologram to the vehicle
-					AttachEntityToEntity(hologramObject, currentVehicle, GetEntityBoneIndexByName(currentVehicle, "chassis"), AttachmentOffset, AttachmentRotation, false, false, false, false, false, true)
-					DebugPrint(string.format("DUI anchor %s attached to %s", hologramObject, currentVehicle))
+					attachHologramToVehicle(hologramObject,currentVehicle)
 
 					-- Wait until the engine is on before enabling the hologram proper
-					repeat Wait(0) until IsVehicleEngineOn(currentVehicle)
+					repeat 
+						Wait(0)
+						if GetVehiclePedIsIn(playerPed, false)~=currentVehicle then
+							currentVehicle=GetVehiclePedIsIn(playerPed, false)
+							hologramObject=createHologram(HologramModel,currentVehicle)
+							attachHologramToVehicle(hologramObject,currentVehicle)
+						end
+					until IsVehicleEngineOn(currentVehicle)
 
 					-- Until the player is no longer driving this vehicle, update the UI
 					repeat
@@ -307,6 +309,20 @@ CreateThread(function()
 		Wait(1000)
 	end
 end)
+function createHologram(HologramModel,currentVehicle)
+	-- Create the hologram objec
+	hologramObject = CreateVehicle(HologramModel, GetEntityCoords(currentVehicle), 0.0, false, true)
+	SetVehicleIsConsideredByPlayer(hologramObject, false)
+	SetVehicleEngineOn(hologramObject, true, true)
+	SetEntityCollision(hologramObject, false, false)
+	DebugPrint("DUI anchor created "..tostring(hologramObject))
+	return hologramObject
+end
+function attachHologramToVehicle(hologramObject,currentVehicle)
+	-- Attach the hologram to the vehicle
+	AttachEntityToEntity(hologramObject, currentVehicle, GetEntityBoneIndexByName(currentVehicle, "chassis"), getAttachmentByVeh(currentVehicle), AttachmentRotation, false, false, false, false, false, true)
+	DebugPrint(string.format("DUI anchor %s attached to %s", hologramObject, currentVehicle))
+end
  
 -- Resource cleanup
 AddEventHandler("onResourceStop", function(resource)
