@@ -323,6 +323,9 @@ function attachHologramToVehicle(hologramObject,currentVehicle)
 	AttachEntityToEntity(hologramObject, currentVehicle, GetEntityBoneIndexByName(currentVehicle, "chassis"), getAttachmentByVeh(currentVehicle), AttachmentRotation, false, false, false, false, false, true)
 	DebugPrint(string.format("DUI anchor %s attached to %s", hologramObject, currentVehicle))
 end
+function getAttachmentByVeh(currentVehicle)
+	return AttachmentOffset
+end
  
 -- Resource cleanup
 AddEventHandler("onResourceStop", function(resource)
