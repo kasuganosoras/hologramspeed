@@ -22,13 +22,13 @@ local textureReplacementMade       = false -- Due to some weirdness with the exp
 local displayEnabled = false
 local currentTheme   = GetConvar("hsp_defaultTheme", "default")
 
-local function DebugPrint(...)
+function DebugPrint(...)
 	if DBG then
 		print(...)
 	end
 end
 
-local function EnsureDuiMessage(data)
+function EnsureDuiMessage(data)
 	if duiObject and duiIsReady then
 		SendDuiMessage(duiObject, json.encode(data))
 		return true
@@ -37,11 +37,11 @@ local function EnsureDuiMessage(data)
 	return false
 end
 
-local function SendChatMessage(message)
+function SendChatMessage(message)
 	TriggerEvent('chat:addMessage', {args = {message}})
 end
 
-local function LoadPlayerProfile()
+function LoadPlayerProfile()
 	local jsonData = GetResourceKvpString(SettingKey)
 	if jsonData ~= nil then
 		jsonData           = json.decode(jsonData)
@@ -52,7 +52,7 @@ local function LoadPlayerProfile()
 	end
 end
 
-local function SavePlayerProfile()
+function SavePlayerProfile()
 	local jsonData = {
 		displayEnabled     = displayEnabled,
 		currentTheme       = currentTheme,
@@ -62,13 +62,13 @@ local function SavePlayerProfile()
 	SetResourceKvp(SettingKey, json.encode(jsonData))
 end
 
-local function ToggleDisplay()
+function ToggleDisplay()
 	displayEnabled = not displayEnabled
 	SendChatMessage("Holographic speedometer " .. (displayEnabled and "^2enabled^r" or "^1disabled^r") .. ".") 
 	SavePlayerProfile()
 end
 
-local function SetTheme(newTheme)
+function SetTheme(newTheme)
 	if newTheme ~= currentTheme then
 		EnsureDuiMessage {theme = newTheme}
 		SendChatMessage(newTheme == "default" and "Holographic speedometer theme ^5reset^r." or ("Holographic speedometer theme set to ^5" .. newTheme .. "^r."))
@@ -77,7 +77,7 @@ local function SetTheme(newTheme)
 	end
 end
 
-local function UpdateEntityAttach()
+function UpdateEntityAttach()
 	local playerPed, currentVehicle
 	playerPed = PlayerPedId()
 	if IsPedInAnyVehicle(playerPed) then
@@ -88,7 +88,7 @@ local function UpdateEntityAttach()
 	end
 end
 
-local function CheckRange(x, y, z, minVal, maxVal)
+function CheckRange(x, y, z, minVal, maxVal)
 	if x == nil or y == nil or z == nil or minVal == nil or maxVal == nil then
 		return false
 	else
@@ -99,7 +99,7 @@ end
 
 -- Command Handler
 
-local function CommandHandler(args)
+function CommandHandler(args)
 
 	local msgErr = "^1The the acceptable range for ^0%s ^1is ^0%f^1 ~ ^0%f^1, reset to default setting.^r"
 	local msgSuc = "^2Speedometer ^0%s ^2changed to ^0%f, %f, %f^r"
@@ -148,7 +148,7 @@ end
 
 -- Initialise the DUI. We only need to do this once.
 
-local function InitialiseDui()
+function InitialiseDui()
 	DebugPrint("Initialising...")
 
 	duiObject = CreateDui(HologramURI, 512, 512)
@@ -178,7 +178,7 @@ end
 
 -- Create hologram entity
 
-local function CreateHologram(HologramModel, currentVehicle)
+function CreateHologram(HologramModel, currentVehicle)
 	-- Create the hologram objec
 	hologramObject = CreateVehicle(HologramModel, GetEntityCoords(currentVehicle), 0.0, false, true)
 	SetVehicleIsConsideredByPlayer(hologramObject, false)
@@ -189,18 +189,9 @@ local function CreateHologram(HologramModel, currentVehicle)
 end
 
 
--- Attach hologram entity to the vehicle
-
-local function AttachHologramToVehicle(hologramObject, currentVehicle)
-	-- Attach the hologram to the vehicle
-	AttachEntityToEntity(hologramObject, currentVehicle, GetEntityBoneIndexByName(currentVehicle, "chassis"), GetAttachmentByVehicle(currentVehicle), AttachmentRotation, false, false, false, false, false, true)
-	DebugPrint(string.format("DUI anchor %s attached to %s", hologramObject, currentVehicle))
-end
-
-
 -- Get the attachment offset by vehicle class (or return default if it doesn't match anything)
 
-local function GetAttachmentByVehicle(currentVehicle)
+function GetAttachmentByVehicle(currentVehicle)
 	local vc = GetVehicleClass(currentVehicle)
 	--[[ Examples, uncomment it if you like
     if(vc == 8 or vc == 13) then
@@ -220,6 +211,15 @@ local function GetAttachmentByVehicle(currentVehicle)
 	end
     ]]--
 	return AttachmentOffset
+end
+
+
+-- Attach hologram entity to the vehicle
+
+function AttachHologramToVehicle(hologramObject, currentVehicle)
+	-- Attach the hologram to the vehicle
+	AttachEntityToEntity(hologramObject, currentVehicle, GetEntityBoneIndexByName(currentVehicle, "chassis"), GetAttachmentByVehicle(currentVehicle), AttachmentRotation, false, false, false, false, false, true)
+	DebugPrint(string.format("DUI anchor %s attached to %s", hologramObject, currentVehicle))
 end
 
 
