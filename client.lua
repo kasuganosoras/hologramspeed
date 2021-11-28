@@ -12,11 +12,11 @@ local SettingKey         = string.format("%s:profile", GetCurrentServerEndpoint(
 local DBG                = false -- Enables debug information, not very useful unless you know what you are doing!
 
 -- Variables
-local duiObject      = false -- The DUI object, used for messaging and is destroyed when the resource is stopped
-local duiIsReady     = false -- Set by a callback triggered by DUI once the javascript has fully loaded
-local hologramObject = 0 -- The current DUI anchor. 0 when one does not exist
+local duiObject                    = false -- The DUI object, used for messaging and is destroyed when the resource is stopped
+local duiIsReady                   = false -- Set by a callback triggered by DUI once the javascript has fully loaded
+local hologramObject               = 0 -- The current DUI anchor. 0 when one does not exist
 local usingMetric, shouldUseMetric = ShouldUseMetricMeasurements() -- Used to track the status of the metric measurement setting
-local textureReplacementMade = false -- Due to some weirdness with the experimental replace texture native, we need to make the replacement after the anchor has been spawned in-game
+local textureReplacementMade       = false -- Due to some weirdness with the experimental replace texture native, we need to make the replacement after the anchor has been spawned in-game
 
 -- Preferences
 local displayEnabled = false
@@ -40,12 +40,6 @@ end
 local function SendChatMessage(message)
 	TriggerEvent('chat:addMessage', {args = {message}})
 end
-
--- Register a callback for when the DUI JS has loaded completely
-RegisterNUICallback("duiIsReady", function(_, cb)
-	duiIsReady = true
-    cb({ok = true})
-end)
 
 local function LoadPlayerProfile()
 	local jsonData = GetResourceKvpString(SettingKey)
@@ -102,6 +96,7 @@ local function CheckRange(x, y, z, minVal, maxVal)
 	end
 end
 
+
 -- Command Handler
 
 local function CommandHandler(args)
@@ -150,29 +145,9 @@ local function CommandHandler(args)
 	end
 end
 
--- Network events
-
-AddEventHandler('HologramSpeed:SetTheme', function(theme)
-	SetTheme(theme)
-end)
-
--- Register command
-
-RegisterCommand("hsp", function(_, args)	
-	if #args == 0 then
-		ToggleDisplay()
-	else
-		CommandHandler(args)
-	end
-end, false)
-
-TriggerEvent('chat:addSuggestion', '/hsp', 'Toggle the holographic speedometer', {
-    { name = "command",  help = "Allow command: theme, offset, rotate" },
-})
-
-RegisterKeyMapping("hsp", "Toggle Holographic Speedometer", "keyboard", "grave") -- default: `
 
 -- Initialise the DUI. We only need to do this once.
+
 local function InitialiseDui()
 	DebugPrint("Initialising...")
 
@@ -200,10 +175,99 @@ local function InitialiseDui()
 	DebugPrint("Done!")
 end
 
+
+-- Create hologram entity
+
+local function CreateHologram(HologramModel, currentVehicle)
+	-- Create the hologram objec
+	hologramObject = CreateVehicle(HologramModel, GetEntityCoords(currentVehicle), 0.0, false, true)
+	SetVehicleIsConsideredByPlayer(hologramObject, false)
+	SetVehicleEngineOn(hologramObject, true, true)
+	SetEntityCollision(hologramObject, false, false)
+	DebugPrint("DUI anchor created "..tostring(hologramObject))
+	return hologramObject
+end
+
+
+-- Attach hologram entity to the vehicle
+
+local function AttachHologramToVehicle(hologramObject, currentVehicle)
+	-- Attach the hologram to the vehicle
+	AttachEntityToEntity(hologramObject, currentVehicle, GetEntityBoneIndexByName(currentVehicle, "chassis"), GetAttachmentByVehicle(currentVehicle), AttachmentRotation, false, false, false, false, false, true)
+	DebugPrint(string.format("DUI anchor %s attached to %s", hologramObject, currentVehicle))
+end
+
+
+-- Get the attachment offset by vehicle class (or return default if it doesn't match anything)
+
+local function GetAttachmentByVehicle(currentVehicle)
+	local vc = GetVehicleClass(currentVehicle)
+	--[[ Examples, uncomment it if you like
+    if(vc == 8 or vc == 13) then
+		return vec3(1.5, -0.5, 0.85)
+	end
+	if(vc == 10 or vc == 20) then
+		return vec3(2.5, 1.5, 2.5)
+	end
+	if(vc == 16) then
+		return vec3(2.5, 1.5, 1.5)
+	end
+	if(vc == 15) then
+		return vec3(2.5, 1, 1.5)
+	end
+	if(vc == 14) then
+		return vec3(2.5, 0, 2)
+	end
+    ]]--
+	return AttachmentOffset
+end
+
+
+-- Network events
+
+AddEventHandler('HologramSpeed:SetTheme', function(theme)
+	SetTheme(theme)
+end)
+
+
+-- Register command
+
+RegisterCommand("hsp", function(_, args)	
+	if #args == 0 then
+		ToggleDisplay()
+	else
+		CommandHandler(args)
+	end
+end, false)
+
+
+-- Register a callback for when the DUI JS has loaded completely
+
+RegisterNUICallback("duiIsReady", function(_, cb)
+	duiIsReady = true
+    cb({ok = true})
+end)
+
+
+-- Add chat suggestion
+
+TriggerEvent('chat:addSuggestion', '/hsp', 'Toggle the holographic speedometer', {
+    { name = "command",  help = "Allow command: theme, offset, rotate" },
+})
+
+
+-- Register keyboard mapping
+
+RegisterKeyMapping("hsp", "Toggle Holographic Speedometer", "keyboard", "grave") -- default: `
+
+
 -- Main Loop
+
 CreateThread(function()
+
 	-- Sanity checks
 	if string.lower(ResourceName) ~= ResourceName then
+        print(string.format("[WARNING] you should rename your HologramSpeed resource folder name to '%s'.", string.lower(ResourceName)))
 		return
 	end
 
@@ -247,7 +311,7 @@ CreateThread(function()
 				repeat Wait(0) until HasModelLoaded(HologramModel)
 
 				-- Create the hologram object
-				hologramObject=createHologram(HologramModel,currentVehicle)
+				hologramObject = CreateHologram(HologramModel,currentVehicle)
 
 				-- Odd hacky fix for people who's textures won't replace properly
 				if not textureReplacementMade then
@@ -261,15 +325,15 @@ CreateThread(function()
 				-- If the ped's current vehicle still exists and they are still driving it...
 				if DoesEntityExist(currentVehicle) and GetPedInVehicleSeat(currentVehicle, -1) == playerPed then
 					-- Attach the hologram to the vehicle
-					attachHologramToVehicle(hologramObject,currentVehicle)
+					AttachHologramToVehicle(hologramObject,currentVehicle)
 
 					-- Wait until the engine is on before enabling the hologram proper
 					repeat 
 						Wait(0)
 						if GetVehiclePedIsIn(playerPed, false)~=currentVehicle then
-							currentVehicle=GetVehiclePedIsIn(playerPed, false)
-							hologramObject=createHologram(HologramModel,currentVehicle)
-							attachHologramToVehicle(hologramObject,currentVehicle)
+							currentVehicle = GetVehiclePedIsIn(playerPed, false)
+							hologramObject = CreateHologram(HologramModel,currentVehicle)
+							AttachHologramToVehicle(hologramObject,currentVehicle)
 						end
 					until IsVehicleEngineOn(currentVehicle)
 
@@ -309,25 +373,9 @@ CreateThread(function()
 		Wait(1000)
 	end
 end)
-function createHologram(HologramModel,currentVehicle)
-	-- Create the hologram objec
-	hologramObject = CreateVehicle(HologramModel, GetEntityCoords(currentVehicle), 0.0, false, true)
-	SetVehicleIsConsideredByPlayer(hologramObject, false)
-	SetVehicleEngineOn(hologramObject, true, true)
-	SetEntityCollision(hologramObject, false, false)
-	DebugPrint("DUI anchor created "..tostring(hologramObject))
-	return hologramObject
-end
-function attachHologramToVehicle(hologramObject,currentVehicle)
-	-- Attach the hologram to the vehicle
-	AttachEntityToEntity(hologramObject, currentVehicle, GetEntityBoneIndexByName(currentVehicle, "chassis"), getAttachmentByVeh(currentVehicle), AttachmentRotation, false, false, false, false, false, true)
-	DebugPrint(string.format("DUI anchor %s attached to %s", hologramObject, currentVehicle))
-end
-function getAttachmentByVeh(currentVehicle)
-	return AttachmentOffset
-end
  
 -- Resource cleanup
+
 AddEventHandler("onResourceStop", function(resource)
 	if resource == ResourceName then
 		DebugPrint("Cleaning up...")
